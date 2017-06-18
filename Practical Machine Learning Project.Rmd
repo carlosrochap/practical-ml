@@ -1,0 +1,115 @@
+---
+title: "Practical Machine Learning Project"
+author: "Carlos Rocha"
+date: "June 18, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r message=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+
+#Project Description
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Datasets
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+Training data is available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+Test data is available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+###Goal
+
+The goal of this project is to predict the manner in which people do certain type of exercises. This is the “classe” variable in the training set. A random forest model is created which is then applied to predict 20 different test cases.
+
+
+##Loading the data
+```{r}
+set.seed(12345)
+trainingSet <- read.csv("data/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+testSet <- read.csv("data/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+Remove Id column and variables with NearZeroVariance.
+```{r}
+nzv <- nearZeroVar(trainingSet, saveMetrics=TRUE)
+trainingSet <- trainingSet[,nzv$nzv==FALSE]
+trainingSet <- trainingSet[c(-1)]
+```
+
+Clean variables with more than 60% NA values, and coerce the data into the same data type.
+```{r}
+trainingV3 <- trainingSet
+for(i in 1:length(trainingSet)) {
+  if( sum( is.na( trainingSet[, i] ) ) /nrow(trainingSet) >= .7) {
+    for(j in 1:length(trainingV3)) {
+      if( length( grep(names(trainingSet[i]), names(trainingV3)[j]) ) == 1)  {
+        trainingV3 <- trainingV3[ , -j]
+      }   
+    } 
+  }
+}
+
+trainingSet <- trainingV3
+rm(trainingV3)
+
+clean1 <- colnames(trainingSet)
+clean2 <- colnames(trainingSet[, -58])  
+testSet <- testSet[clean2]             
+
+for (i in 1:length(testSet) ) {
+  for(j in 1:length(trainingSet)) {
+    if( length( grep(names(trainingSet[i]), names(testSet)[j]) ) == 1)  {
+      class(testSet[j]) <- class(trainingSet[i])
+    }      
+  }      
+}
+
+testSet <- rbind(trainingSet[2, -58] , testSet)
+testSet <- testSet[-1,]
+
+```
+#Predicting with a Decision Tree
+Creating and plotting the model
+```{r}
+modFitA1 <- rpart(classe ~ ., data=trainingSet, method="class")
+fancyRpartPlot(modFitA1)
+
+```
+
+Predicting class value for test data.
+```{r}
+predictionsA1 <- predict(modFitA1, testSet, type = "class")
+predictionsA1
+```
+
+#Predicting using Random Forest
+Creating prediction model using random forest
+```{r}
+modFitB1 <- randomForest(classe ~ ., data=trainingSet)
+```
+
+Plotting random forest model
+```{r}
+plot(modFitB1)
+```
+
+Predicting class values on test data using random forest model
+```{r}
+predictionB2 <- predict(modFitB1, testSet, type = "class")
+predictionB2
+```
